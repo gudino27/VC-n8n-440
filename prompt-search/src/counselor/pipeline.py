@@ -56,43 +56,100 @@ class VirtualCounselorPipeline:
         prompt = template.render(student_context + question)
         return self.client.generate(prompt, max_tokens=800)
 
-    def can_take(self, course_code: str, completed_courses: list = None) -> dict:
+    def can_take(self, course_codes, completed_courses: list = None) -> dict:
         completed_courses = completed_courses or []
-        result = self.checker.check(course_code, completed_courses)
 
-        if not result["found"]:
-            answer = f"Course {course_code} was not found in the catalog."
-        elif result["can_take"]:
-            answer = f"Yes, you can take {course_code}. All prerequisites are satisfied."
-            if result["prereqs"]:
-                answer += f" (Required: {', '.join(result['prereqs'])})"
-        else:
-            answer = (
-                f"No, you cannot take {course_code} yet. "
-                f"You are missing these prerequisites: {', '.join(result['missing'])}."
+        # Accept a single string or a list
+        if isinstance(course_codes, str):
+            course_codes = [course_codes]
+
+        # Run the deterministic checker and retrieve catalog context for each course
+        check_results = []
+        context_chunks = []
+        for code in course_codes:
+            result = self.checker.check(code, completed_courses)
+            check_results.append((code, result))
+            entry = self.retriever.get_by_code(code)
+            if entry:
+                context_chunks.append(entry)
+
+        # Build structured summary to ground the LLM
+        structured_lines = []
+        for code, r in check_results:
+            if not r["found"]:
+                structured_lines.append(f"- {code}: NOT FOUND in catalog")
+            elif r["can_take"]:
+                prereq_note = f" (requires: {', '.join(r['prereqs'])})" if r["prereqs"] else " (no prerequisites)"
+                structured_lines.append(f"- {code}: student CAN take this course{prereq_note}")
+            else:
+                structured_lines.append(
+                    f"- {code}: student CANNOT take this course yet — "
+                    f"missing: {', '.join(r['missing'])}; "
+                    f"already completed: {', '.join(r['completed']) if r['completed'] else 'none'}"
+                )
+
+        catalog_context = "\n\n---\n\n".join(
+            c["chunk_text"] for c in context_chunks
+        ) if context_chunks else "No catalog entries found for the requested courses."
+
+        student_context = f"Student's completed courses: {', '.join(completed_courses)}" if completed_courses else "Student has no completed courses on record."
+
+        courses_asked = ", ".join(course_codes)
+        template = PromptTemplate(
+            task_description=(
+                f"A student is asking whether they can enroll in the following course(s): {courses_asked}.\n\n"
+                f"Catalog context:\n{catalog_context}\n\n"
+                f"Verified prerequisite check results (treat these as facts — do not contradict them):\n"
+                + "\n".join(structured_lines) + "\n\n"
+                + student_context
             )
-            if result["completed"]:
-                answer += f" You have already completed: {', '.join(result['completed'])}."
+        )
+        template = PromptMutator.add_domain_context(template, "course_planning")
+        template = PromptMutator.add_cot(template)
 
-        result["answer"] = answer
-        return result
+        question = f"Can I take {courses_asked}?"
+        prompt = template.render(question)
+        answer = self.client.generate(prompt, max_tokens=600)
+
+        return {"answer": answer, "checks": check_results}
 
     def graduation_check(self, degree_program: str, completed_courses: list = None) -> dict:
         completed_courses = completed_courses or []
         result = self.advisor.get_remaining(degree_program, completed_courses)
 
-        if not result["remaining"]:
-            answer = (
-                f"Based on catalog requirements found, you appear to have completed "
-                f"all {len(result['completed_matches'])} identifiable courses for {degree_program}."
-            )
-        else:
-            answer = (
-                f"For {degree_program}, you still need {len(result['remaining'])} course(s): "
-                f"{', '.join(result['remaining'][:10])}"
-            )
-            if len(result["remaining"]) > 10:
-                answer += f" ... and {len(result['remaining']) - 10} more."
+        if result.get("error"):
+            result["answer"] = result["error"]
+            return result
 
-        result["answer"] = answer
+        degree_chunk = result["degree_chunk"]
+        catalog_context = degree_chunk["chunk_text"] if degree_chunk else ""
+
+        student_context = (
+            f"Student's completed courses: {', '.join(completed_courses)}"
+            if completed_courses
+            else "Student has no completed courses on record."
+        )
+
+        structured_summary = (
+            f"Degree: {result['degree_program']} ({result.get('total_credits')} credits total)\n"
+            f"Required courses found: {len(result['required_courses'])}\n"
+            f"Student has completed: {', '.join(result['completed_matches']) if result['completed_matches'] else 'none of the required courses'}\n"
+            f"Still needed: {', '.join(result['remaining']) if result['remaining'] else 'none — all requirements satisfied'}"
+        )
+
+        template = PromptTemplate(
+            task_description=(
+                f"A student is asking about their progress toward graduating with a degree in "
+                f"{degree_program}.\n\n"
+                f"Degree requirements from the catalog:\n{catalog_context}\n\n"
+                f"Verified progress summary (treat these as facts — do not contradict them):\n"
+                f"{structured_summary}\n\n"
+                f"{student_context}"
+            )
+        )
+        template = PromptMutator.add_domain_context(template, "course_planning")
+        template = PromptMutator.add_cot(template)
+
+        prompt = template.render(f"What do I still need to graduate with a {degree_program} degree?")
+        result["answer"] = self.client.generate(prompt, max_tokens=800)
         return result

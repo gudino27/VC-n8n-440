@@ -1,6 +1,9 @@
 import re
 
-COURSE_CODE_RE = re.compile(r'\b([A-Z]{2,6}\s+\d{3,4})\b')
+
+def _norm(code: str) -> str:
+    """Collapse spaces so 'CPT S 121' and 'CPTS 121' both become 'CPTS121'."""
+    return re.sub(r'\s+', '', code.upper())
 
 
 class GradAdvisor:
@@ -8,23 +11,50 @@ class GradAdvisor:
         self.retriever = retriever
 
     def get_remaining(self, degree_program: str, completed_courses: list) -> dict:
-        completed = {c.upper().strip() for c in completed_courses}
+        completed_norm = {_norm(c) for c in completed_courses}
 
+        # Search for the degree requirements chunk
         query = f"requirements for {degree_program} degree graduation courses"
-        chunks = self.retriever.search(query, top_k=10)
+        chunks = self.retriever.search(query, top_k=15)
 
-        required_codes = set()
+        # Find the best matching degree_requirements chunk
+        degree_chunk = None
+        degree_norm = _norm(degree_program)
         for chunk in chunks:
-            found = COURSE_CODE_RE.findall(chunk["chunk_text"].upper())
-            required_codes.update(found)
+            if chunk.get("chunk_type") == "degree_requirements":
+                chunk_name_norm = _norm(chunk.get("degree_name", ""))
+                # Accept if the degree name contains the search term or vice versa
+                if degree_norm in chunk_name_norm or chunk_name_norm in degree_norm:
+                    degree_chunk = chunk
+                    break
 
-        completed_matches = sorted(required_codes & completed)
-        remaining = sorted(required_codes - completed)
+        if degree_chunk is None:
+            return {
+                "degree_program": degree_program,
+                "degree_chunk": None,
+                "required_courses": [],
+                "completed_matches": [],
+                "remaining": [],
+                "error": f"No degree requirements found for '{degree_program}'. "
+                         "Try a name like 'Computer Science', 'Software Engineering', or 'Cybersecurity'.",
+            }
+
+        required = degree_chunk["required_courses"]
+
+        # Normalize and match
+        completed_matches = sorted(
+            c for c in required if _norm(c) in completed_norm
+        )
+        remaining = sorted(
+            c for c in required if _norm(c) not in completed_norm
+        )
 
         return {
             "degree_program": degree_program,
-            "required_found": sorted(required_codes),
+            "degree_chunk": degree_chunk,
+            "required_courses": required,
             "completed_matches": completed_matches,
             "remaining": remaining,
-            "chunks_used": len(chunks),
+            "total_credits": degree_chunk.get("total_credits"),
+            "error": None,
         }

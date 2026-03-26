@@ -68,9 +68,9 @@ def main():
         # Route: prerequisite check
         if "can i take" in lower or "can i enroll" in lower:
             import re
-            match = re.search(r'\b([A-Z]{2,6}\s+\d{3,4})\b', question.upper())
-            if match:
-                result = pipeline.can_take(match.group(1), completed)
+            matches = re.findall(r'\b([A-Z]{2,6}\s+\d{3,4})\b', question.upper())
+            if matches:
+                result = pipeline.can_take(matches, completed)
                 print(f"\nCounselor: {result['answer']}\n")
             else:
                 print("\nCounselor: Please include a course code, e.g. 'Can I take CPTS 360?'\n")
