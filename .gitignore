@@ -69,3 +69,5 @@ n8n-catalog-updater-fixed.json
 n8n-main.json
 
 virtual-counselor/src/components/DegreePlanner.js.bak
+
+venv/ 
