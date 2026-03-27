@@ -2,11 +2,9 @@ import re
 
 # Matches degree block headers like "BACHELOR OF SCIENCE, COMPUTER SCIENCE" or
 # standalone program names like "SOFTWARE ENGINEERING", "CYBERSECURITY"
-_DEGREE_TITLE_RE = re.compile(
-    r'^(BACHELOR OF [A-Z ,\-]+|MASTER OF [A-Z ,\-]+|DOCTOR OF [A-Z ,\-]+'
-    r'|SOFTWARE ENGINEERING|CYBERSECURITY|COMPUTER ENGINEERING'
-    r'|ELECTRICAL ENGINEERING)\s*$'
-)
+# Matches any all-uppercase program name line (letters, spaces, commas, hyphens, ampersands).
+# The credits line check in parse_degree_chunks provides the real validation.
+_DEGREE_TITLE_RE = re.compile(r'^[A-Z][A-Z ,\-&/]{2,}[A-Z]\s*$')
 
 # Matches "(120 CREDITS)" or "(124 CREDITS)" etc.
 _CREDITS_RE = re.compile(r'^\((\d{2,3}) CREDITS\)$')
