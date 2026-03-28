@@ -32,3 +32,7 @@ matplotlib>=3.7
 
 # Utilities
 tqdm>=4.66
+
+# RAG
+sentence-transformers>=2.7
+faiss-cpu>=1.8
