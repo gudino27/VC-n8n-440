@@ -59,7 +59,10 @@ class CatalogIngestor:
             if _PREFIX_LINE_RE.match(stripped) and i + 1 < len(lines):
                 next_stripped = lines[i + 1].strip()
                 if _COURSE_NUM_RE.match(next_stripped):
+                    flush()
                     current_prefix = stripped
+                    current_number = None
+                    current_lines = []
                     continue
 
             if current_prefix is None:
