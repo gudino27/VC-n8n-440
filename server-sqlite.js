@@ -89,6 +89,15 @@ const webhookLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Rate limiting for the LLM Advice endpoint (NEW)
+const llmRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20,
+  message: { error: 'rate_limit', message: 'Maximum 20 requests per hour exceeded.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Apply rate limiting
 app.use('/api/', apiLimiter);
 
@@ -757,6 +766,52 @@ app.get('/health', async (req, res) => {
       status: 'unhealthy',
       error: error.message
     });
+  }
+});
+
+// Secure LLM Advising Endpoint (NEW)
+app.post('/api/llm-advice', llmRateLimiter, async (req, res) => {
+  try {
+    const rawQuestion = req.body.question || "";
+    const studentContext = req.body.studentContext || {};
+
+    // 1. Primary Guardrail: Input Sanitization & Length Check
+    // Strip null bytes, control characters, and trim whitespace
+    let sanitizedQuestion = rawQuestion.replace(/[\x00-\x1F\x7F-\x9F]/g, "").trim();
+    
+    // Enforce 500 character limit
+    if (sanitizedQuestion.length > 500) {
+      sanitizedQuestion = sanitizedQuestion.substring(0, 500);
+    }
+
+    if (!sanitizedQuestion) {
+      return res.status(400).json({ error: "invalid_input", message: "Question cannot be empty." });
+    }
+
+    // 2. Secondary Guardrail: LLM Topic Classification
+    const classificationPrompt = `Is this question about WSU academic advising, courses, or degree planning? Answer YES or NO. Question: "${sanitizedQuestion}"`;
+    
+    // TODO: Replace this placeholder with your actual LLM call to classify the topic
+    // const classificationResult = await callYourLLM(classificationPrompt);
+    const classificationResult = "YES"; // Placeholder
+    
+    if (!classificationResult.toUpperCase().includes("YES")) {
+      return res.status(400).json({ 
+        error: "off_topic", 
+        message: "I can only assist with WSU academic advising, course recommendations, and degree planning." 
+      });
+    }
+
+    // 3. Proceed with standard RAG retrieval
+    // TODO: Insert your actual logic to fetch course data from SQLite and generate the final answer
+    const finalAnswer = `Here is some advice based on your question: "${sanitizedQuestion}"\n\n(This is a placeholder response. RAG integration pending.)`;
+    const sources = ["CptS 111", "CptS 121"]; // Placeholder
+
+    res.json({ answer: finalAnswer, sources: sources });
+
+  } catch (error) {
+    console.error("LLM Route Error:", error);
+    res.status(500).json({ error: "server_error", message: "Failed to process request." });
   }
 });
 
