@@ -7,6 +7,7 @@ function Navbar({ activeTab, setActiveTab, theme, toggleTheme }) {
   const navLinks = [
     { id: 'planner', label: 'Degree Planner' },
     { id: 'search', label: 'Course Search' },
+    { id: 'chat', label: 'Advisor Chat' }, // Addition for advisor chat screen
   ];
 
   return (

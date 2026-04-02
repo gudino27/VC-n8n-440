@@ -96,3 +96,20 @@ export default {
   fetchPrefixes,
   fetchTerms,
 };
+
+export const getLLMAdvice = async (question, studentContext) => {
+  // Client-side guardrail: Strip HTML before sending
+  const cleanQuestion = question.replace(/<\/?[^>]+(>|$)/g, "");
+
+  const response = await fetch('/api/llm-advice', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question: cleanQuestion, studentContext })
+  });
+  
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || "Something went wrong.");
+  }
+  return data;
+};

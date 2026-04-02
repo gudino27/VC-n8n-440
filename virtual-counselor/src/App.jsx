@@ -1,12 +1,14 @@
 import React, { useState, Suspense, lazy, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
+import ChatWidget from './components/ChatWidget'; // <-- Import the ChatWidget
 import { saveTheme, loadTheme } from './utils/storage';
 import './index.css';
 
 // Lazy load heavy components for better initial bundle size
 const DegreePlanner = lazy(() => import('./components/DegreePlanner'));
 const CoursePlanner = lazy(() => import('./components/CoursePlanner'));
+const ChatPage = lazy(() => import('./components/ChatPage'));
 
 // Loading spinner component
 function LoadingSpinner() {
@@ -40,7 +42,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col transition-colors duration-300">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col transition-colors duration-300 relative">
       <Toaster
         position="top-right"
         toastOptions={{
@@ -57,18 +59,22 @@ function App() {
           },
         }}
       />
-      {/* Toaster mounted for app-wide toasts */}
+      
       <Navbar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} toggleTheme={toggleTheme} />
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 safe-area-pb">
         <Suspense fallback={<LoadingSpinner />}>
           {activeTab === 'planner' && <DegreePlanner />}
           {activeTab === 'search' && <CoursePlanner />}
+          {activeTab === 'chat' && <ChatPage />}      {/* Chat Page addition */}
         </Suspense>
       </main>
+
+      {/* Mount ChatWidget at the root level so it persists across tab changes & hide floating widget if already on full screen chat */}      
+      {activeTab !== 'chat' && <ChatWidget />}
+
     </div>
   );
 }
 
 export default App;
-
