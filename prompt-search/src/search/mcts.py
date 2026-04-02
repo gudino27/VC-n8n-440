@@ -67,6 +67,7 @@ class MCTSPromptSearch:
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.root: Optional[MCTSNode] = None
+        self.history: List[Dict] = []
 
     def search(
         self,
@@ -87,12 +88,19 @@ class MCTSPromptSearch:
             Number of selection→expansion→simulation→backprop cycles.
         """
         self.root = MCTSNode(copy.deepcopy(initial_prompt))
+        self.history = []
 
-        for _ in range(num_iterations):
+        for i in range(num_iterations):
             node = self._select(self.root)
             child = self._expand(node)
             reward = self._simulate(child, validation_set)
             self._backpropagate(child, reward)
+
+            best_avg = max(
+                (c.total_reward / c.visits for c in self.root.children if c.visits > 0),
+                default=0.0,
+            )
+            self.history.append({"iteration": i + 1, "best_avg_reward": best_avg})
 
         if not self.root.children:
             return self.root.template

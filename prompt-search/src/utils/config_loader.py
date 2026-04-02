@@ -36,6 +36,15 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return merged
 
 
+def load_search_config(algorithm: str) -> dict:
+    """Load hyperparameters for a search algorithm from config/{algorithm}.yaml."""
+    path = CONFIG_DIR / f"{algorithm}.yaml"
+    if not path.exists():
+        raise FileNotFoundError(f"No search config found for '{algorithm}' at {path}")
+    with open(path) as f:
+        return yaml.safe_load(f)
+
+
 def load_config(profile: str = "claude") -> dict:
     default_path = CONFIG_DIR / "default.yaml"
     profile_path = CONFIG_DIR / f"{profile}.yaml"
