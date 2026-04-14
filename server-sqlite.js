@@ -931,9 +931,15 @@ app.get('/api/degrees', async (req, res) => {
 // First tries database (for saved requirements), then falls back to WSU API
 app.get('/api/degree-requirements', async (req, res) => {
   try {
-    const { name, acadUnitId: providedAcadUnitId, type = 'degree' } = req.query;
+    const rawType = req.query.type;
+    const type = typeof rawType === 'string' ? rawType : 'degree';
+    const { name, acadUnitId: providedAcadUnitId } = req.query;
 
-    if (!name) {
+    if (!['degree', 'minor', 'certificate'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid type parameter' });
+    }
+
+    if (!name || typeof name !== 'string') {
       return res.status(400).json({ error: 'Degree name is required' });
     }
 
@@ -1107,6 +1113,11 @@ app.get('/api/degree-requirements', async (req, res) => {
       acadUnitId = degreeInfo.acadUnitId;
     }
     
+    // Validate acadUnitId is a safe numeric value before embedding in URL
+    if (!/^\d+$/.test(String(acadUnitId))) {
+      return res.status(400).json({ error: 'Invalid academic unit ID' });
+    }
+
     // Fetch the academic unit data which includes course requirements
     const unitResponse = await fetch(`https://catalog.wsu.edu/api/Data/GetAcademicUnit/${acadUnitId}/General`);
     const unitData = await unitResponse.json();
@@ -2054,7 +2065,7 @@ app.post('/webhook/catalog-pdf', webhookAuth, async (req, res) => {
           console.log(`[INFO] Added PDF: ${pdf.filename}`);
         }
       } catch (pdfError) {
-        console.error(`Error processing PDF ${pdf.filename}:`, pdfError.message);
+        console.error('Error processing PDF:', pdf.filename, pdfError.message);
       }
     }
 
@@ -2133,7 +2144,7 @@ app.post('/webhook/degrees', webhookAuth, async (req, res) => {
 
         added++;
       } catch (degreeError) {
-        console.error(`Error processing degree ${degree.name}:`, degreeError.message);
+        console.error('Error processing degree:', degree.name, degreeError.message);
       }
     }
 
@@ -2752,29 +2763,36 @@ app.post('/webhook/catalog-programs', webhookAuth, async (req, res) => {
     // Helper: extract course codes from free text (fallback when prereq arrays are missing)
     const extractCourseCodes = (text) => {
       if (!text || typeof text !== 'string') return [];
-      // Find tokens like 'CPTS 121', 'CPT S 121', 'MATH 171', etc.
-      // Allow optional spaces inside alpha portion and optional punctuation.
-      const re = /([A-Za-z]{1,8}(?:\s+[A-Za-z])?(?:\s*)[-–:]?\s*\d{3})/g;
-      const matches = [];
-      const blacklist = new Set(['OR', 'AND', 'ONE', 'BY', 'WITH', 'A', 'THE', 'OR,']);
-      let m;
-      while ((m = re.exec(text)) !== null) {
-        let code = m[1].toUpperCase();
-        // Normalize spaces inside the alpha part: e.g. 'CPT S 121' -> 'CPTS 121'
-        code = code.replace(/([A-Z])\s+(?=[A-Z])/g, '$1');
-        // Collapse multiple spaces
-        code = code.replace(/\s+/g, ' ');
-        // Ensure format PREFIX NUMBER
-        const parts = code.split(' ');
-        if (parts.length >= 2) {
-          const num = parts.pop();
-          const prefix = parts.join('').replace(/[^A-Z]/g, '');
-          if (!prefix || prefix.length < 2) continue; // ignore tiny prefixes
-          if (blacklist.has(prefix)) continue;
-          // basic sanity: number should be 3 digits
-          if (!/^\d{3}$/.test(num)) continue;
-          matches.push(`${prefix} ${num}`);
+
+      // Step 1: normalize underscore/dash separators between prefix and number
+      // e.g. CPTS_121 -> CPTS 121, MATH-171 -> MATH 171
+      let normalized = text.replace(/([A-Za-z]{2,8})[_-](\d{3})\b/g, '$1 $2');
+
+      // Step 2: expand continuation numbers — "CPTS 121 or 223" -> "CPTS 121 or CPTS 223"
+      // Handles comma/and/or and combinations like ", or 220"
+      normalized = normalized.replace(
+        /\b([A-Za-z]{2,8}(?:\s[A-Za-z]{1,4})?)\s+(\d{3})\b((?:\s*(?:[,;]|\bor\b|\band\b)(?:\s*(?:\bor\b|\band\b))?\s*\d{3}\b)+)/gi,
+        (_match, prefix, firstNum, rest) => {
+          const expanded = rest.replace(/(\d{3})/g, `${prefix} $1`);
+          return `${prefix} ${firstNum}${expanded}`;
         }
+      );
+
+      // Step 3: match all course code tokens.
+      // Negative lookahead blocks matches that start with a conjunction (or, and, by, …)
+      // so the engine finds the real prefix on the next attempt rather than skipping it.
+      // Supports split prefixes up to 4 chars (CPT S, E E, CON E, CST M, BIO ENG).
+      // (?!\d) prevents partial matches of 4-digit numbers.
+      const re = /\b(?!(?:or|and|one|by|with|the|of|in|to|for)\b)([A-Za-z]{1,8}(?:\s[A-Za-z]{1,4})?\s*\d{3})(?!\d)/gi;
+      const matches = [];
+      let m;
+      while ((m = re.exec(normalized)) !== null) {
+        const words = m[1].trim().toUpperCase().split(/\s+/);
+        const num = words[words.length - 1];
+        const prefix = words.slice(0, -1).join('').replace(/[^A-Z]/g, '');
+        if (!prefix || prefix.length < 2) continue;
+        if (!/^\d{3}$/.test(num)) continue;
+        matches.push(`${prefix} ${num}`);
       }
       // Deduplicate preserving order
       return [...new Set(matches)];
@@ -3008,12 +3026,13 @@ app.get('/api/catalog/courses', async (req, res) => {
 // Search across all catalog years
 app.get('/api/catalog/search', async (req, res) => {
   try {
-    const { q, type, year } = req.query;
-    
-    if (!q || q.length < 2) {
+    const q = typeof req.query.q === 'string' ? req.query.q : '';
+    const { type, year } = req.query;
+
+    if (q.length < 2) {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
-    
+
     const searchTerm = `%${q}%`;
     const results = { degrees: [], minors: [], certificates: [] };
     

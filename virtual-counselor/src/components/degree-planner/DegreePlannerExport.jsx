@@ -55,7 +55,7 @@ export const exportToICS = async ({ degreePlan, years }) => {
         const startDate = new Date(eventYear, termStart.month - 1, termStart.day, 8, 0, 0);
         const endDate = new Date(eventYear, termStart.month - 1, termStart.day, 9, 0, 0); // 1 hour dummy slot
         
-        const uid = `${course.id || Date.now()}-${Math.random().toString(36).substr(2, 9)}@virtualcounselor.com`;
+        const uid = `${course.id || Date.now()}-${crypto.randomUUID()}@virtualcounselor.com`;
         const dtStamp = formatICSDate(new Date());
         const dtStart = formatICSDate(startDate);
         const dtEnd = formatICSDate(endDate);
