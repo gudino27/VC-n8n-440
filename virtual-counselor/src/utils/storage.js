@@ -15,10 +15,12 @@ export function saveDegreePlan(plan) {
   try {
     const str = JSON.stringify(plan);
     console.debug('[storage] saveDegreePlan -> writing', STORAGE_KEYS.DEGREE_PLAN);
-    // Academic planning data (no credentials/tokens) stored in browser-sandboxed localStorage
-    localStorage.setItem(STORAGE_KEYS.DEGREE_PLAN, str); // lgtm[js/clear-text-storage-of-sensitive-data]
+    // Academic planning data only (no credentials/tokens) — safe for browser localStorage
+    // lgtm[js/clear-text-storage-of-sensitive-data]
+    localStorage.setItem(STORAGE_KEYS.DEGREE_PLAN, str);
     // back-compat: also store old key used by earlier builds
-    try { localStorage.setItem('vc-degree-plan', str); } catch (_) {} // lgtm[js/clear-text-storage-of-sensitive-data]
+    // lgtm[js/clear-text-storage-of-sensitive-data]
+    try { localStorage.setItem('vc-degree-plan', str); } catch (_) {}
     return true;
   } catch (error) {
     console.error('Error saving degree plan:', error);

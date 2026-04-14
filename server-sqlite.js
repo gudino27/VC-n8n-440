@@ -1113,13 +1113,15 @@ app.get('/api/degree-requirements', async (req, res) => {
       acadUnitId = degreeInfo.acadUnitId;
     }
     
-    // Validate acadUnitId is a safe numeric value before embedding in URL
-    if (!/^\d+$/.test(String(acadUnitId))) {
+    // Parse to integer — rejects any non-numeric value including strings with path chars.
+    // Using the parsed integer (not the original string) in the URL prevents SSRF.
+    const safeUnitId = parseInt(String(acadUnitId), 10);
+    if (!Number.isFinite(safeUnitId) || safeUnitId <= 0) {
       return res.status(400).json({ error: 'Invalid academic unit ID' });
     }
 
     // Fetch the academic unit data which includes course requirements
-    const unitResponse = await fetch(`https://catalog.wsu.edu/api/Data/GetAcademicUnit/${acadUnitId}/General`);
+    const unitResponse = await fetch(`https://catalog.wsu.edu/api/Data/GetAcademicUnit/${safeUnitId}/General`);
     const unitData = await unitResponse.json();
     
     // Find the specific degree program
