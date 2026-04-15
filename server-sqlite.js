@@ -11,7 +11,7 @@ const axios = require('axios');
 
 // Security: Validate required environment variables
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
-      
+const { executeNotebook } = require('./prompt-search/scripts/execute_notebook');      
 
 if (!WEBHOOK_SECRET) {
   logger.error('WEBHOOK_SECRET not set! Please set it in .env.production before starting.');
@@ -3079,6 +3079,133 @@ app.get('/api/catalog/search', async (req, res) => {
     console.error('Error searching catalog:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// Guardrail 1: Rate Limiter (Max 20 requests per hour)
+const llmRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20,
+  message: { error: 'rate_limit_exceeded', message: 'Maximum 20 LLM requests per hour allowed.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Guardrail 2: Input Sanitization
+const sanitizeLlmInput = (req, res, next) => {
+  const sanitizeStr = (str) => {
+    if (typeof str !== 'string') return str;
+    return str
+      .replace(/[\x00-\x1F\x7F-\x9F]/g, "") // Strip null bytes & control chars
+      .replace(/<[^>]*>?/gm, '');           // Strip HTML/script tags
+  };
+
+  if (req.body) {
+    if (req.body.question) {
+      req.body.question = sanitizeStr(req.body.question);
+      if (req.body.question.length > 500) {
+        return sendBadRequest(res, "payload_too_large", "Question exceeds 500 characters limit.");
+      }
+    }
+    if (req.body.query) {
+      req.body.query = sanitizeStr(req.body.query);
+      if (req.body.query.length > 500) {
+        return sendBadRequest(res, "payload_too_large", "Query exceeds 500 characters limit.");
+      }
+    }
+  }
+  next();
+};
+
+// Guardrail 3: Topic Classification Prompt
+async function isLlmTopicAllowed(question) {
+    const courseRegex = /[A-Z]{2,4}\s*S?\s*\d{3}/i;
+    if (courseRegex.test(question)) return true;
+
+    try {
+        const result = await executeNotebook('notebooks/production/api_advice.ipynb', {
+            question: `Is this question about WSU academic advising, courses, or degree planning? Answer ONLY with YES or NO. Question: "${question}"`,
+            use_rag: false 
+        });
+        
+        // If NO, return 400 with {error: "off_topic"}
+        const answer = result.answer.trim().toUpperCase();
+        return answer.includes("YES");
+    } catch (e) {
+        return true; // Failsafe to avoid blocking users on server errors
+    }
+}
+
+// 1. LLM Health Check
+app.get('/api/llm-health', (req, res) => {
+  const modelPath = path.resolve(__dirname, 'data/models/llama-3.1-8b-q4.gguf');
+  
+  if (fs.existsSync(modelPath)) {
+    res.json({ status: "healthy", model_path: modelPath });
+  } else {
+    // We return a standard JSON instead of a 404/500 so the frontend can read the status gracefully
+    res.json({ status: "model_not_found", model_path: modelPath });
+  }
+});
+
+// 2. Main Advising Endpoint
+app.post('/api/llm-advice', llmRateLimiter, sanitizeLlmInput, async (req, res) => {
+  const { question, student_context = {}, use_rag = true } = req.body;
+
+  if (!question) {
+    return res.status(400).json({ error: "bad_request", message: "Question is missing." });
+  }
+
+  try {
+    const notebookPath = path.join(__dirname, 'notebooks', 'production', 'api_advice.ipynb');
+
+    // secondary guardrail: Topic Classification
+    console.log(`\n🛡️ Running route-level guardrail check...`);
+    const classificationPrompt = `Is this question about WSU academic advising, courses, or degree planning? Answer ONLY with YES or NO. Question: "${question}"`;
+    
+    const classResult = await executeNotebook(notebookPath, { 
+        question: classificationPrompt, 
+        student_context: {}, 
+        use_rag: false 
+    });
+
+    // If the AI says NO, block the request and return a 400
+    if (classResult.answer.toUpperCase().includes('NO')) {
+        console.log(`🚫 Blocked off-topic question: "${question}"`);
+        return res.status(400).json({ 
+            error: "off_topic", 
+            message: "I can only answer questions related to WSU academic advising, courses, or degree planning." 
+        });
+    }
+
+    // execution
+    console.log(`✅ Passed guardrail. Processing advising request...`);
+    const result = await executeNotebook(notebookPath, { question, student_context, use_rag });
+    
+    return res.status(200).json(result);
+
+  } catch (error) {
+    console.error("Error executing notebook:", error);
+    return res.status(500).json({ 
+      error: "notebook_execution_failed", 
+      message: error.message 
+    });
+  }
+});
+
+app.post('/api/llm-search-courses', sanitizeLlmInput, async (req, res) => {
+    const { query, top_k = 5 } = req.body;
+    if (!query) return res.status(400).json({ error: "Query is missing." });
+
+    try {
+        const result = await executeNotebook('notebooks/production/api_search_courses.ipynb', { 
+            question: query, 
+            top_k 
+        });
+        res.json(result);
+    } catch (error) {
+        logger.error('LLM Course Search Error', { meta: { error: error.message } });
+        sendServerError(res, error);    
+      }
 });
 
 // Error handling middleware
