@@ -101,7 +101,8 @@ export const getLLMAdvice = async (question, studentContext) => {
   // Client-side guardrail: Strip HTML before sending
   const cleanQuestion = question.replace(/<\/?[^>]+(>|$)/g, "");
 
-  const response = await fetch('/api/llm-advice', {
+  // FIXED: Added ${API_URL} to the front of the route
+  const response = await fetch(`${API_URL}/api/llm-advice`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question: cleanQuestion, studentContext })
