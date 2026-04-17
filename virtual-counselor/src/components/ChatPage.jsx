@@ -2,13 +2,31 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, User, GraduationCap } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
 import { getLLMAdvice } from '../utils/api';
+import { getCompletedCourses, calculateCreditsAchieved } from '../utils/degreeCalculations';
 
 export default function ChatPage() {
     const { messages, addMessage } = useChatStore();
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [statusMsg, setStatusMsg] = useState('');
     const messagesEndRef = useRef(null);
+
+    const STATUS_STEPS = [
+        'Validating your question...',
+        'Searching course records...',
+        'Reviewing degree requirements...',
+        'Generating your response...',
+    ];
+
+    useEffect(() => {
+        if (!isLoading) { setStatusMsg(''); return; }
+        setStatusMsg(STATUS_STEPS[0]);
+        const timers = STATUS_STEPS.slice(1).map((msg, i) =>
+            setTimeout(() => setStatusMsg(msg), (i + 1) * 5000)
+        );
+        return () => timers.forEach(clearTimeout);
+    }, [isLoading]);
 
     // Auto-scroll to the newest message
     useEffect(() => {
@@ -16,7 +34,7 @@ export default function ChatPage() {
     }, [messages]);
 
     const isAllowedTopic = (text) => {
-        const pattern = /wsu|course|class|degree|credit|major|schedule|ucore|advising|prerequisite/i;
+        const pattern = /wsu|course|class|degree|credit|major|schedule|ucore|advising|prerequisite|take|register|enroll|graduate|semester|gpa|grade|meet|seat|open|section|offered|available|instructor|waitlist|when\s+is|what\s+time|[a-z]{2,6}(\s+[a-z]{1,2})?\s*\d{3}/i;
         return pattern.test(text);
     };
 
@@ -41,9 +59,17 @@ export default function ChatPage() {
             const storedProfileInfo = localStorage.getItem('studentProfile');
             const parsedProfile = storedProfileInfo ? JSON.parse(storedProfileInfo) : {};
 
+            const rawPlan = localStorage.getItem('wsu_vc_degree_plan');
+            const degreePlan = rawPlan ? JSON.parse(rawPlan)?.plan ?? JSON.parse(rawPlan) : null;
+            const completedFromPlan = degreePlan ? getCompletedCourses(degreePlan) : [];
+            const creditsAchieved = degreePlan ? calculateCreditsAchieved(degreePlan) : 0;
+
             const studentContext = {
                 major: parsedProfile.major || "Undeclared",
-                completed_courses: parsedProfile.completed_courses || []
+                completed_courses: completedFromPlan.length > 0
+                    ? completedFromPlan
+                    : (parsedProfile.completed_courses || []),
+                credits_completed: creditsAchieved,
             };
 
             const response = await getLLMAdvice(userMsg, studentContext);
@@ -122,10 +148,9 @@ export default function ChatPage() {
                         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-wsu-crimson text-white flex items-center justify-center">
                             <GraduationCap size={16} />
                         </div>
-                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-1">
-                            <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
-                            <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
-                            <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2">
+                            <span className="w-2 h-2 bg-wsu-crimson rounded-full animate-pulse"></span>
+                            <span className="text-sm text-gray-500 dark:text-gray-400 italic">{statusMsg}</span>
                         </div>
                     </div>
                 )}

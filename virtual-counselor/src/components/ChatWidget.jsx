@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { MessageCircle, X, Trash2 } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
 import { getLLMAdvice } from '../utils/api';
+import { getCompletedCourses, calculateCreditsAchieved } from '../utils/degreeCalculations';
 import ReactMarkdown from 'react-markdown';
 
 export default function ChatWidget() {
@@ -12,7 +13,7 @@ export default function ChatWidget() {
 
     // Client-side regex check
     const isAllowedTopic = (text) => {
-        const pattern = /wsu|course|class|degree|credit|major|schedule|ucore|advising|prerequisite/i;
+        const pattern = /wsu|course|class|degree|credit|major|schedule|ucore|advising|prerequisite|take|register|enroll|graduate|semester|gpa|grade|meet|seat|open|section|offered|available|instructor|waitlist|when\s+is|what\s+time|[a-z]{2,6}(\s+[a-z]{1,2})?\s*\d{3}/i;
         return pattern.test(text);
     };
 
@@ -46,9 +47,17 @@ export default function ChatWidget() {
             const storedProfileInfo = localStorage.getItem('studentProfile');
             const parsedProfile = storedProfileInfo ? JSON.parse(storedProfileInfo) : {};
 
+            const rawPlan = localStorage.getItem('wsu_vc_degree_plan');
+            const degreePlan = rawPlan ? JSON.parse(rawPlan)?.plan ?? JSON.parse(rawPlan) : null;
+            const completedFromPlan = degreePlan ? getCompletedCourses(degreePlan) : [];
+            const creditsAchieved = degreePlan ? calculateCreditsAchieved(degreePlan) : 0;
+
             const studentContext = {
                 major: parsedProfile.major || "Undeclared",
-                completed_courses: parsedProfile.completed_courses || []
+                completed_courses: completedFromPlan.length > 0
+                    ? completedFromPlan
+                    : (parsedProfile.completed_courses || []),
+                credits_completed: creditsAchieved,
             };
 
             const response = await getLLMAdvice(userMsg, studentContext);

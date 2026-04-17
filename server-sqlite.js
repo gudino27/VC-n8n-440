@@ -3149,7 +3149,8 @@ app.get('/api/llm-health', (req, res) => {
 
 // 2. Main Advising Endpoint
 app.post('/api/llm-advice', llmRateLimiter, sanitizeLlmInput, async (req, res) => {
-  const { question, student_context = {}, use_rag = true } = req.body;
+  const { question, studentContext, student_context, use_rag = true } = req.body;
+  const resolvedContext = studentContext || student_context || {};
 
   if (!question) {
     return res.status(400).json({ error: "bad_request", message: "Question is missing." });
@@ -3158,36 +3159,27 @@ app.post('/api/llm-advice', llmRateLimiter, sanitizeLlmInput, async (req, res) =
   try {
     const notebookPath = path.join(__dirname, 'notebooks', 'production', 'api_advice.ipynb');
 
-    // secondary guardrail: Topic Classification
-    console.log(`\n🛡️ Running route-level guardrail check...`);
-    const classificationPrompt = `Is this question about WSU academic advising, courses, or degree planning? Answer ONLY with YES or NO. Question: "${question}"`;
-    
-    const classResult = await executeNotebook(notebookPath, { 
-        question: classificationPrompt, 
-        student_context: {}, 
-        use_rag: false 
-    });
-
-    // If the AI says NO, block the request and return a 400
-    if (classResult.answer.toUpperCase().includes('NO')) {
-        console.log(`🚫 Blocked off-topic question: "${question}"`);
-        return res.status(400).json({ 
-            error: "off_topic", 
-            message: "I can only answer questions related to WSU academic advising, courses, or degree planning." 
+    // Fast regex guardrail — no LLM call needed for topic classification
+    const ALLOWED_TOPIC_RE = /wsu|course|class|degree|credit|major|schedule|ucore|advising|prerequisite|take|register|enroll|graduat|semester|gpa|grade|catalog|requirement|curriculum|transfer|minor|certificate|meet|seat|open|section|offered|available|instructor|waitlist|when\s+is|what\s+time|[a-z]{2,6}(\s+[a-z]{1,2})?\s*\d{3}/i;
+    console.log(`\n[guardrail] Running check...`);
+    if (!ALLOWED_TOPIC_RE.test(question)) {
+        console.log(`[guardrail] Blocked off-topic question: "${question}"`);
+        return res.status(400).json({
+            error: "off_topic",
+            message: "I can only answer questions related to WSU academic advising, courses, or degree planning."
         });
     }
-
-    // execution
-    console.log(`✅ Passed guardrail. Processing advising request...`);
-    const result = await executeNotebook(notebookPath, { question, student_context, use_rag });
+    console.log(`[guardrail] Passed. Processing advising request...`);
+    const result = await executeNotebook(notebookPath, { question, student_context: resolvedContext, use_rag });
     
     return res.status(200).json(result);
 
   } catch (error) {
     console.error("Error executing notebook:", error);
-    return res.status(500).json({ 
-      error: "notebook_execution_failed", 
-      message: error.message 
+    return res.status(200).json({
+      answer: "I'm having trouble accessing course information right now. Please try again in a moment or contact your academic advisor directly.",
+      sources: [],
+      metadata: { error: true }
     });
   }
 });
