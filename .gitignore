@@ -71,4 +71,8 @@ n8n-main.json
 virtual-counselor/src/components/DegreePlanner.js.bak
 
 venv/
-*.backup 
+*.backup
+
+# Generated notebook outputs and test artifacts
+prompt-search/notebooks/evaluation/*_output.ipynb
+prompt-search/data/test_results/dryrun_*.json 
