@@ -2,9 +2,9 @@ import copy
 import random
 from typing import Callable, Dict, List, Optional, Tuple
 
-from src.llm.base import BaseLLMClient
-from src.prompts.mutations import PromptMutator
-from src.prompts.template import PromptTemplate
+from llm.base import BaseLLMClient
+from prompts.mutations import PromptMutator
+from prompts.template import PromptTemplate
 
 
 def _default_match(response: str, expected: str) -> bool:

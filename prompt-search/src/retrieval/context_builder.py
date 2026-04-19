@@ -3,8 +3,20 @@ from __future__ import annotations
 import json
 import os
 import re
+from pathlib import Path
 from .retriever import CourseRetriever
 from .db_client import CourseDB
+
+_RAG_CONFIG_PATH = Path(__file__).resolve().parents[3] / "config" / "rag.yaml"
+
+
+def _load_rag_config() -> dict:
+    try:
+        import yaml
+        with open(_RAG_CONFIG_PATH) as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
 
 _FEW_SHOT_PATH = os.path.join(os.path.dirname(__file__), "../../data/domain/few_shot_examples.json")
 
@@ -66,9 +78,11 @@ def _load_few_shot_examples(n: int = 3) -> str:
 class ContextBuilder:
     """Builds a RAG-augmented prompt by injecting retrieved course context."""
 
-    def __init__(self, retriever: CourseRetriever, top_k: int = 5, few_shot_n: int = 3):
+    def __init__(self, retriever: CourseRetriever, top_k: int | None = None, few_shot_n: int = 3):
+        cfg = _load_rag_config()
         self.retriever = retriever
-        self.top_k = top_k
+        self.top_k = top_k if top_k is not None else cfg.get("top_k", 5)
+        self.max_context_words = cfg.get("max_context_words", None)
         self.few_shot_examples = _load_few_shot_examples(few_shot_n)
         self.db = CourseDB()
 
@@ -197,5 +211,10 @@ class ContextBuilder:
             prompt = f"{system_prefix}{base_prompt}\n\nQuestion: {question}"
         else:
             prompt = f"{system_prefix}Question: {question}"
+
+        if self.max_context_words:
+            words = prompt.split()
+            if len(words) > self.max_context_words:
+                prompt = " ".join(words[:self.max_context_words])
 
         return prompt, sources
