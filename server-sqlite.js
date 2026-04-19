@@ -877,20 +877,29 @@ app.get('/api/degrees', async (req, res) => {
     }
     
     const whereClause = 'WHERE ' + whereClauses.join(' AND ');
-    
+
+    // Union catalog_degrees with catalog_minors and catalog_certificates so all programs appear
     const allDegrees = await dbAll(`
       SELECT id, catalog_year, name, credits, degree_type, college, url, source_type, external_id, narrative
-      FROM catalog_degrees 
+      FROM catalog_degrees
+      ${whereClause}
+      UNION
+      SELECT id, catalog_year, name, NULL as credits, 'minor' as degree_type, NULL as college, url, source_type, NULL as external_id, narrative
+      FROM catalog_minors
+      ${whereClause}
+      UNION
+      SELECT id, catalog_year, name, NULL as credits, 'certificate' as degree_type, NULL as college, url, source_type, NULL as external_id, description as narrative
+      FROM catalog_certificates
       ${whereClause}
       ORDER BY name, source_type DESC
-    `, params);
-    
-    // Deduplicate by name (case-insensitive), preferring 'api' over 'catalog_json'
+    `, [...params, ...params, ...params]);
+
+    // Deduplicate by name+type (case-insensitive), preferring 'api' over 'catalog_json'
     const deduped = new Map();
     for (const degree of allDegrees) {
-      const key = degree.name.toLowerCase();
+      const key = `${degree.name.toLowerCase()}||${degree.degree_type}`;
       const existing = deduped.get(key);
-      
+
       // Keep this entry if: no existing entry, or this is from API and existing is from catalog_json
       if (!existing || (degree.source_type === 'api' && existing.source_type === 'catalog_json')) {
         deduped.set(key, degree);
