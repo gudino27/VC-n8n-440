@@ -7,6 +7,13 @@
   "examples": [
     {
       "category": "prerequisite_validation",
+      "question": "Can I take CPTS 483 (capstone) now?",
+      "context": {"completed_courses": ["CPTS 121", "CPTS 122", "CPTS 223", "CPTS 322"]},
+      "reasoning": "CPTS 483 is the senior design capstone. It requires CPTS 322 (met) AND senior standing (90+ credits).",
+      "answer": "Yes for course prerequisites (CPTS 322 required), but CPTS 483 also requires senior standing (90+ credits completed)."
+    },
+    {
+      "category": "prerequisite_validation",
       "question": "Can I take CPTS 360 if I've finished CPTS 121, 122, 223, and MATH 171?",
       "context": {"completed_courses": ["CPTS 121", "CPTS 122", "CPTS 223", "MATH 171"]},
       "reasoning": "CPTS 360 prerequisites are CPTS 223 and CPTS 260. The student has CPTS 223 but not CPTS 260. CPTS 260 requires CPTS 121 and MATH 171, which the student has completed, so CPTS 260 is the next step.",

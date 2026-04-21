@@ -431,7 +431,7 @@
           "MATH 220"
         ]
       },
-      "expected_answer": "Yes. CPTS 466 requires CPTS 122 and MATH 220 (Linear Algebra).",
+      "expected_answer": "Yes. CPTS 466 requires CPTS 360. Full chain: CPTS 121 -> CPTS 122 -> CPTS 223 -> CPTS 260 -> CPTS 360 -> CPTS 466.",
       "reasoning_steps": [
         "CPTS 466 prereqs: CPTS 122, MATH 220",
         "Both satisfied",
@@ -670,7 +670,7 @@
       "context": {
         "target_course": "STAT 443"
       },
-      "expected_answer": "STAT 443 requires MATH 172 or 182, plus MATH 220, 225, or 230. Chain: MATH 171 -> MATH 172 -> STAT 443.",
+      "expected_answer": "STAT 443 requires MATH 172 or 182, plus MATH 220, 225, or 230. Shortest path: MATH 171 -> MATH 172 and MATH 171 -> MATH 220 (or 225 or 230).",
       "reasoning_steps": [
         "STAT 443 prereq: STAT 360",
         "STAT 360 prereq: MATH 172",

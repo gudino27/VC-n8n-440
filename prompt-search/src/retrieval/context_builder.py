@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 from .retriever import CourseRetriever
 from .db_client import CourseDB
+from .reranker import NvidiaReranker
 
 _RAG_CONFIG_PATH = Path(__file__).resolve().parents[3] / "config" / "rag.yaml"
 
@@ -78,13 +79,15 @@ def _load_few_shot_examples(n: int = 3) -> str:
 class ContextBuilder:
     """Builds a RAG-augmented prompt by injecting retrieved course context."""
 
-    def __init__(self, retriever: CourseRetriever, top_k: int | None = None, few_shot_n: int = 3):
+    def __init__(self, retriever: CourseRetriever, top_k: int | None = None, few_shot_n: int = 4):
         cfg = _load_rag_config()
         self.retriever = retriever
         self.top_k = top_k if top_k is not None else cfg.get("top_k", 5)
         self.max_context_words = cfg.get("max_context_words", None)
         self.few_shot_examples = _load_few_shot_examples(few_shot_n)
         self.db = CourseDB()
+        self.reranker_fetch_k = cfg.get("reranker_fetch_k", self.top_k * 4)
+        self.reranker = NvidiaReranker(top_n=self.top_k)
 
     def _prereq_block(self, question: str, hops: int = 2) -> str:
         """Pull exact prereq data from DB, following the chain up to `hops` levels deep."""
@@ -173,13 +176,22 @@ class ContextBuilder:
         sources : list[dict]
             The retrieved course entries used as context.
         """
-        sources = self.retriever.search(question, top_k=self.top_k)
+        candidates = self.retriever.search(question, top_k=self.reranker_fetch_k)
+        sources = self.reranker.rerank(question, candidates)
+
+        _ADMISSION_RE = re.compile(
+            r',?\s*(and\s+)?admission\s+to\s+a\s+(major\s+or\s+minor|minor\s+or\s+major)'
+            r'[^.;]*',
+            re.IGNORECASE,
+        )
 
         context_lines = []
         for entry in sources:
-            line = f"- {entry['course_code']}: {entry['chunk_text'][:300]}"
+            chunk = _ADMISSION_RE.sub("", entry["chunk_text"][:300]).strip().rstrip(",")
+            line = f"- {entry['course_code']}: {chunk}"
             if entry.get("prereq_raw"):
-                line += f" (Prerequisites: {entry['prereq_raw']})"
+                prereq = _ADMISSION_RE.sub("", entry["prereq_raw"]).strip().rstrip(",")
+                line += f" (Prerequisites: {prereq})"
             context_lines.append(line)
 
         context_block = "\n".join(context_lines)
@@ -197,7 +209,13 @@ class ContextBuilder:
         system_prefix = (
             "You are a WSU academic advisor. Use the following course information "
             "to answer the student's question accurately. "
-            "Answer in 1-2 sentences. Be concise and do not use markdown formatting.\n\n"
+            "Answer in 1-2 sentences. Be concise and do not use markdown formatting. "
+            "Do not ask the student for more information — answer based on published course prerequisites only. "
+            "When asked 'Can I take X?' without a list of completed courses, state the prerequisites for X and answer Yes. "
+            "For prerequisite chain questions, show the full chain using arrows: COURSE A -> COURSE B -> COURSE C. "
+            "IMPORTANT: Never mention EECS, Data Analytics, or any department admission or enrollment requirements — "
+            "these are administrative restrictions, not course prerequisites. State only course numbers as prerequisites. "
+            "If a course requires senior standing (90+ credits) or junior standing (60+ credits), state that explicitly.\n\n"
             f"{ucore_block}"
             f"{degree_block}"
             f"{prereq_block}"
