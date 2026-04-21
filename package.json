@@ -18,7 +18,7 @@
   "license": "MIT",
   "dependencies": {
     "@domattheshack/rate-my-professors": "^2.2.1",
-    "axios": "^1.15.0",
+    "axios": "^1.15.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
