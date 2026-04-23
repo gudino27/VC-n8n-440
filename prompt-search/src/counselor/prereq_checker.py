@@ -110,29 +110,36 @@ def _parse_or_group(clause: str) -> list:
     # "with a C or better", "each with a C", "(or concurrent enrollment)",
     # "or higher", "or by permission", "admitted to ...", etc.
     # We do this by cutting at known trailing keywords.
-    trailers = [
-        r",?\s*with a [A-Z]\+? or better.*$",
-        r",?\s*with a [A-Z]\+?\s*$",
-        r",?\s*each with.*$",
-        r",?\s*or higher.*$",
-        r",?\s*or by permission.*$",
-        r",?\s*\(or concurrent.*?\).*$",
-        r",?\s*or concurrent enrollment.*$",
-        r",?\s*admitted to.*$",
-        r",?\s*admission to.*$",
-        r",?\s*a min(?:imum)? ALEKS.*$",
-        r",?\s*ALEKS math.*$",
-        r",?\s*minimum score.*$",
-        r",?\s*by permission.*$",
-        r",?\s*or a min.*$",
-        r",?\s*or an AP.*$",
-        r",?\s*or AP.*$",
-        r",?\s*junior standing.*$",
-        r",?\s*senior standing.*$",
-        r",?\s*sophomore standing.*$",
-        r",?\s*graduate standing.*$",
-        r",?\s*for majors.*$",
+    # Grade qualifiers — strip only the phrase itself, not the rest of the
+    # clause. "MATH 106 or 201 with a C or better, or MATH 171" must retain
+    # the trailing " or MATH 171".
+    trailers_inline = [
+        r",?\s*with a [A-Z]\+? or better",
+        r",?\s*with a [A-Z]\+?(?=[,;]|$)",
+        r",?\s*each with a [A-Z]\+? or better",
     ]
+    # Phrases that genuinely terminate the prereq list (admission gates,
+    # score gates, standing requirements). Anything after them is
+    # out-of-scope for course-code extraction.
+    trailers_terminal = [
+        r",?\s*admitted to\b.*$",
+        r",?\s*admission to\b.*$",
+        r",?\s*a min(?:imum)? ALEKS\b.*$",
+        r",?\s*ALEKS math\b.*$",
+        r",?\s*minimum score\b.*$",
+        r",?\s*\bby permission\b.*$",
+        r",?\s*or a min(?:imum)?\b.*$",
+        r",?\s*or an AP\b.*$",
+        r",?\s*or AP exam\b.*$",
+        r",?\s*junior standing\b.*$",
+        r",?\s*senior standing\b.*$",
+        r",?\s*sophomore standing\b.*$",
+        r",?\s*graduate standing\b.*$",
+        r",?\s*for majors\b.*$",
+        r",?\s*\(or concurrent[^)]*\)",
+        r",?\s*or concurrent enrollment\b.*$",
+    ]
+    trailers = trailers_inline + trailers_terminal
     core = clause
     for pat in trailers:
         core = re.sub(pat, "", core, flags=re.I)
