@@ -28,7 +28,7 @@ def get_builder():
     if _builder is None:
         from retrieval.retriever import CourseRetriever
         from retrieval.context_builder import ContextBuilder
-        _builder = ContextBuilder(CourseRetriever(index_dir=INDEX_DIR), top_k=3)
+        _builder = ContextBuilder(CourseRetriever(index_dir=INDEX_DIR), top_k=3, few_shot_n=2)
     return _builder
 
 
@@ -68,18 +68,25 @@ def advise(req: AdviseRequest):
                 student_block += f"Student major: {major}\n"
 
         builder = get_builder()
-        prompt, sources = builder.build(req.question, base_prompt=student_block)
+        system_prompt, sources = builder.build(req.question, base_prompt=student_block)
 
-        # Call llama.cpp server
+        # Use chat completions endpoint so the instruct model applies its template correctly
         response = httpx.post(
-            f"{LLAMACPP_URL}/completion",
-            json={"prompt": prompt, "n_predict": req.max_tokens, "temperature": 0.0,
-                  "stop": ["</s>", "\n\nQuestion:", "###"]},
+            f"{LLAMACPP_URL}/v1/chat/completions",
+            json={
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": req.question},
+                ],
+                "max_tokens": min(req.max_tokens, 300),
+                "temperature": 0.0,
+                "stop": ["###"],
+            },
             timeout=60.0,
         )
         response.raise_for_status()
         data = response.json()
-        answer = data.get("content", "").strip()
+        answer = data["choices"][0]["message"]["content"].strip()
         model  = data.get("model", "llama.cpp")
         source_codes = [s.get("course_code", "") for s in sources]
 
