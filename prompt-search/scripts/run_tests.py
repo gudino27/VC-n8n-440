@@ -31,7 +31,7 @@ TEST_CASES_PATH = os.path.join(
 INDEX_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "domain")
 DEFAULT_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "test_results")
 
-COURSE_CODE_RE = re.compile(r"\b([A-Z]{2,6}\s+\d{3,4})\b")
+COURSE_CODE_RE = re.compile(r"\b([A-Z]{2,8}\s+\d{3,4})\b")
 
 
 def parse_args():

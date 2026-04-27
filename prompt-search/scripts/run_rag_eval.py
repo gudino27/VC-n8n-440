@@ -2,8 +2,10 @@
 Re-run RAG evaluation bypassing cache, save results to data/results/rag_eval_results.json.
 Usage (from prompt-search/):
     venv/bin/python3 scripts/run_rag_eval.py
+    venv/bin/python3 scripts/run_rag_eval.py --local
+    venv/bin/python3 scripts/run_rag_eval.py --local --model models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf
 """
-import sys, os, json, time
+import sys, os, json, time, argparse
 from pathlib import Path
 from collections import defaultdict
 from dotenv import load_dotenv
@@ -14,8 +16,14 @@ load_dotenv(ROOT / ".env")
 
 from retrieval.retriever import CourseRetriever
 from retrieval.context_builder import ContextBuilder
-from llm.claude_client import ClaudeClient
 from evaluation.metrics import EvaluationMetrics
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--local", action="store_true", help="Use local GGUF model instead of Claude Haiku")
+parser.add_argument("--model", default=str(ROOT / "models" / "Llama-3.2-3B-Instruct-Q4_K_M.gguf"),
+                    help="Path to GGUF model file (used with --local)")
+parser.add_argument("--threads", type=int, default=8, help="CPU threads for local model")
+args = parser.parse_args()
 
 INDEX_DIR   = ROOT / "data" / "domain"
 RESULTS_DIR = ROOT / "data" / "results"
@@ -24,7 +32,19 @@ RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 retriever = CourseRetriever(index_dir=str(INDEX_DIR))
 builder   = ContextBuilder(retriever, top_k=5)
-client    = ClaudeClient(model="claude-haiku-4-5", api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+if args.local:
+    from llm.local_client import LocalLlamaClient
+    model_path = args.model
+    if not Path(model_path).exists():
+        print(f"Model not found: {model_path}")
+        sys.exit(1)
+    print(f"Loading local model: {Path(model_path).name} ({args.threads} threads)...")
+    client = LocalLlamaClient(model_path=model_path, n_ctx=8192, n_threads=args.threads)
+    print("Model loaded.\n")
+else:
+    from llm.claude_client import ClaudeClient
+    client = ClaudeClient(model="claude-haiku-4-5", api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 raw = json.loads(TEST_CASES.read_text())
 test_cases = (raw["cases"] if isinstance(raw, dict) else raw)[:120]
