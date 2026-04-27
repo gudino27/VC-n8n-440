@@ -36,8 +36,10 @@ if __name__ == "__main__":
     model = SentenceTransformer("all-MiniLM-L6-v2")
     embeddings = model.encode(texts, show_progress_bar=True, convert_to_numpy=True)
     embeddings = embeddings.astype(np.float32)
+    # L2-normalize so IndexFlatIP scores equal cosine similarity
+    faiss.normalize_L2(embeddings)
 
-    index = faiss.IndexFlatL2(embeddings.shape[1])
+    index = faiss.IndexFlatIP(embeddings.shape[1])
     index.add(embeddings)
 
     faiss.write_index(index, os.path.join(output_dir, "courses.faiss"))

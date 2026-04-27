@@ -54,10 +54,12 @@
       "context": {
         "completed_courses": [
           "CPTS 121",
+          "CPTS 122",
+          "CPTS 223",
           "MATH 171"
         ]
       },
-      "expected_answer": "Yes. CPTS 260 requires CPTS 121 and MATH 171; both are complete.",
+      "expected_answer": "Yes. Per the 2024 catalog, CPTS 260 requires CPTS 223 (concurrent enrollment allowed), which is complete.",
       "reasoning_steps": [
         "CPTS 260 prereqs: CPTS 121, MATH 171",
         "Both present in completed_courses",
@@ -92,10 +94,11 @@
           "CPTS 122",
           "CPTS 223",
           "MATH 171",
-          "MATH 172"
+          "MATH 172",
+          "MATH 216"
         ]
       },
-      "expected_answer": "Yes. CPTS 317 requires CPTS 223, which you have completed.",
+      "expected_answer": "Yes. Per the 2024 catalog, CPTS 317 requires (CPTS 122 or 132) and MATH 216, both complete.",
       "reasoning_steps": [
         "CPTS 317 prereq: CPTS 223",
         "CPTS 223 is completed",
@@ -132,7 +135,7 @@
           "CPTS 317"
         ]
       },
-      "expected_answer": "No. CPTS 323 requires CPTS 322.",
+      "expected_answer": "Yes. CPTS 323 has no listed prerequisites in the 2024 catalog.",
       "reasoning_steps": [
         "CPTS 323 prereq: CPTS 322",
         "CPTS 322 missing",
@@ -188,7 +191,7 @@
           "MATH 172"
         ]
       },
-      "expected_answer": "No. CPTS 437 requires CPTS 315 or STAT 360. Neither is complete.",
+      "expected_answer": "Yes. CPTS 437 requires one of CPTS 215, 223, or 233; CPTS 223 is complete.",
       "reasoning_steps": [
         "CPTS 437 prereq: CPTS 315 OR STAT 360",
         "Neither satisfied",
@@ -258,7 +261,7 @@
           "MATH 171"
         ]
       },
-      "expected_answer": "No. MATH 273 requires MATH 172.",
+      "expected_answer": "Yes. MATH 273 has no listed prerequisites in the 2024 catalog (MATH 172 is typically recommended as preparation).",
       "reasoning_steps": [
         "MATH 273 prereq: MATH 172",
         "MATH 172 missing",
@@ -275,7 +278,7 @@
           "MATH 172"
         ]
       },
-      "expected_answer": "Yes. MATH 216 (Discrete Structures) requires MATH 172.",
+      "expected_answer": "Yes. MATH 216 requires one of MATH 106, 201, 140, 171, or 202; MATH 171 is complete.",
       "reasoning_steps": [
         "MATH 216 prereq: MATH 172",
         "Satisfied",
@@ -326,7 +329,7 @@
         ],
         "class_standing": "junior"
       },
-      "expected_answer": "Yes. ENGL 402 requires ENGL 101 and junior standing, both met.",
+      "expected_answer": "Catalog gap: ENGL 402 is not found in the 2024 course catalog index. Generally ENGL 402 requires ENGL 101 and junior standing, which are met.",
       "reasoning_steps": [
         "ENGL 402 prereq: ENGL 101 + junior standing",
         "Both satisfied",
@@ -357,7 +360,7 @@
       "context": {
         "completed_courses": []
       },
-      "expected_answer": "Yes. CPTS 121 has no CS prerequisite; MATH 171 is recommended but not required.",
+      "expected_answer": "No. Per the 2024 catalog, CPTS 121 requires MATH 108, 171, 172, 182, 201, 202, 206, or 220 (or CPT S 111, or ALEKS 78%, or AP credit); none are complete.",
       "reasoning_steps": [
         "CPTS 121 has no hard prereq",
         "Open entry",
@@ -431,7 +434,7 @@
           "MATH 220"
         ]
       },
-      "expected_answer": "Yes. CPTS 466 requires CPTS 360. Full chain: CPTS 121 -> CPTS 122 -> CPTS 223 -> CPTS 260 -> CPTS 360 -> CPTS 466.",
+      "expected_answer": "No. CPTS 466 requires CPTS 360, which is not complete.",
       "reasoning_steps": [
         "CPTS 466 prereqs: CPTS 122, MATH 220",
         "Both satisfied",
@@ -486,7 +489,7 @@
           "STAT 360"
         ]
       },
-      "expected_answer": "Yes. STAT 443 requires STAT 360.",
+      "expected_answer": "No. STAT 443 requires (MATH 172 or 182) and (MATH 220, 225, or 230); the second group is missing.",
       "reasoning_steps": [
         "STAT 443 prereq: STAT 360",
         "Satisfied",
@@ -502,7 +505,7 @@
           "MATH 171"
         ]
       },
-      "expected_answer": "Yes. PHYSICS 201 requires MATH 171 (or concurrent).",
+      "expected_answer": "Yes. PHYSICS 201 has no listed prerequisites in the 2024 catalog; MATH 171 is recommended preparation and is complete.",
       "reasoning_steps": [
         "PHYSICS 201 prereq: MATH 171",
         "Satisfied",
@@ -1214,9 +1217,13 @@
         "proposed": [
           "PHYSICS 201",
           "MATH 171"
+        ],
+        "completed_courses": [
+          "MATH 106",
+          "MATH 108"
         ]
       },
-      "expected_answer": "Yes. PHYSICS 201 allows MATH 171 concurrent.",
+      "expected_answer": "Yes. PHYSICS 201 has no prereqs; MATH 171 requires MATH 106 (or 108 or ALEKS 83%), which is complete. They can be taken the same term.",
       "reasoning_steps": [
         "PHYSICS 201 prereq/concurrent: MATH 171",
         "Allowed simultaneously"
@@ -1278,9 +1285,15 @@
           "CPTS 260",
           "MATH 172",
           "PHYSICS 201"
+        ],
+        "completed_courses": [
+          "CPTS 121",
+          "CPTS 122",
+          "MATH 171",
+          "MATH 216"
         ]
       },
-      "expected_answer": "Yes if prereqs (CPTS 122, MATH 171) are done. Total ~14 cr; challenging but feasible.",
+      "expected_answer": "Yes. With CPTS 122, MATH 171, and MATH 216 complete, all four can be taken together. ~14 credits; challenging but feasible.",
       "reasoning_steps": [
         "Prereq status must include CPTS 122, MATH 171",
         "No course conflicts between these",
@@ -1295,9 +1308,13 @@
         "proposed": [
           "MATH 172",
           "PHYSICS 202"
+        ],
+        "completed_courses": [
+          "MATH 171",
+          "PHYSICS 201"
         ]
       },
-      "expected_answer": "Yes. PHYSICS 202 allows MATH 172 concurrent.",
+      "expected_answer": "Yes. MATH 172 requires MATH 171 (complete); PHYSICS 202 requires PHYSICS 201 (complete) and allows MATH 172 as concurrent enrollment.",
       "reasoning_steps": [
         "PHYSICS 202 prereq/concurrent: MATH 172",
         "Allowed"
@@ -1315,10 +1332,11 @@
         "completed_courses": [
           "CPTS 121",
           "CPTS 122",
-          "MATH 171"
+          "MATH 171",
+          "MATH 216"
         ]
       },
-      "expected_answer": "Yes. Their prereqs do not overlap and are independent after CPTS 122 and MATH 171.",
+      "expected_answer": "Yes. CPTS 223 requires CPTS 122 + MATH 216 (complete); CPTS 260 requires CPTS 223 (concurrent enrollment allowed). Both can be taken together.",
       "reasoning_steps": [
         "CPTS 223 prereq: CPTS 122 -> met",
         "CPTS 260 prereqs: CPTS 121, MATH 171 -> met",
@@ -1411,10 +1429,11 @@
         "completed_courses": [
           "CPTS 121",
           "CPTS 122",
-          "CPTS 223"
+          "CPTS 223",
+          "MATH 216"
         ]
       },
-      "expected_answer": "Yes, all three require CPTS 223 which is complete. ~9 credits.",
+      "expected_answer": "Yes. With CPTS 122, CPTS 223, and MATH 216 complete, all three can be taken in one term. ~9 credits.",
       "reasoning_steps": [
         "Each prereq: CPTS 223 -> met",
         "No conflicts"
@@ -1430,9 +1449,13 @@
           "MATH 171",
           "ENGL 101",
           "HISTORY 105"
+        ],
+        "completed_courses": [
+          "MATH 106",
+          "MATH 108"
         ]
       },
-      "expected_answer": "Yes. ~14-15 credits, all freshman-accessible.",
+      "expected_answer": "Yes. With MATH 106/108 complete (or an ALEKS score), CPTS 121 and MATH 171 are open. HISTORY 105 and ENGL 101 have no prereqs. ~14-15 credits.",
       "reasoning_steps": [
         "No prereqs blocking",
         "Balanced ~14-15 cr freshman term"
