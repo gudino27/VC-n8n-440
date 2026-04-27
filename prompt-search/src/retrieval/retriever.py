@@ -74,9 +74,23 @@ def _norm_name(s: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", s.upper())
 
 
+def _build_index(index_dir: str) -> None:
+    """Build courses.faiss from scratch if it is missing."""
+    import subprocess
+    import sys
+    scripts_dir = os.path.join(os.path.dirname(__file__), "..", "..", "scripts")
+    build_script = os.path.abspath(os.path.join(scripts_dir, "build_index.py"))
+    print(f"[retriever] courses.faiss not found — building index from {build_script} ...")
+    subprocess.run([sys.executable, build_script], check=True)
+    print("[retriever] Index build complete.")
+
+
 class CourseRetriever:
     def __init__(self, index_dir: str = "data/domain"):
-        self.index = faiss.read_index(os.path.join(index_dir, "courses.faiss"))
+        faiss_path = os.path.join(index_dir, "courses.faiss")
+        if not os.path.exists(faiss_path):
+            _build_index(index_dir)
+        self.index = faiss.read_index(faiss_path)
         with open(os.path.join(index_dir, "metadata.json")) as f:
             self.metadata = json.load(f)
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
