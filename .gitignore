@@ -88,3 +88,4 @@ prompt-search/writeup/
 # FAISS index (regenerate with prompt-search/scripts/build_index.py)
 *.faiss
 !README.md
+!prompt-search/writeup/project_writeup.pdf
